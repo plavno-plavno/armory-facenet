@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'" />
+    <title>FaceID Engine — unlock</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body style="display: block; padding: 22px">
+    <h1 id="title">Vault password</h1>
+    <p class="muted" id="hint">The system keychain is unavailable. The encryption key is protected with a password.</p>
+    <form id="f" class="row">
+      <input id="pw" type="password" autofocus required minlength="8" style="width: 240px" />
+      <input id="pw2" type="password" placeholder="repeat" style="width: 240px; display: none" />
+      <button class="primary">OK</button>
+    </form>
+    <div id="err" class="err"></div>
+    <script src="unlock.js"></script>
+  </body>
+</html>

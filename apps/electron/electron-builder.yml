@@ -1,0 +1,45 @@
+# Installers (spec §14): NSIS (Windows), dmg (macOS), AppImage + deb (Linux).
+appId: local.faceid.engine
+productName: FaceID Engine
+directories:
+  output: out
+  buildResources: build
+files:
+  - dist/**
+  - "!dist/**/*.map"
+  - package.json
+asar: true
+asarUnpack:
+  - "**/*.node"
+  - node_modules/onnxruntime-node/**
+  - node_modules/sharp/**
+  - node_modules/@img/**
+extraResources:
+  # Models are verified by sha256 from manifest.json at every engine start (spec §6.4).
+  - from: ../../models
+    to: models
+    filter: ["manifest.json", "*.onnx"]
+  # LGPL ffmpeg build, placed here by CI (spec §17 R8). Missing -> ffmpeg from PATH.
+  - from: ../../vendor/ffmpeg/${platform}-${arch}
+    to: ffmpeg
+    filter: ["**/*"]
+win:
+  target: nsis
+nsis:
+  oneClick: false
+  perMachine: false
+mac:
+  target: dmg
+  category: public.app-category.utilities
+  hardenedRuntime: true
+  extendInfo:
+    NSCameraUsageDescription: "The camera is used to recognize registered people and to capture enrollment photos."
+linux:
+  target: [AppImage, deb]
+  category: Utility
+  executableName: faceid-desktop
+  syncDesktopName: true
+  # TODO: replace with the real maintainer before distribution.
+  maintainer: "FaceID Engine <maintainer@example.com>"
+deb:
+  depends: ["libsecret-1-0", "libnss3", "libgtk-3-0", "libxss1", "libasound2t64 | libasound2"]

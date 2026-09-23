@@ -1,0 +1,35 @@
+{
+  "name": "faceid-engine",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/shared && npm run build -w apps/engine",
+    "test": "vitest run",
+    "identify": "tsx apps/engine/src/cli/identify.ts",
+    "bench": "tsx apps/engine/src/cli/bench.ts",
+    "calibrate": "tsx apps/engine/src/cli/calibrate.ts",
+    "engine": "node scripts/with-cuda.mjs tsx apps/engine/src/main.ts",
+    "parity:ref": ".venv-parity/bin/python tests/parity/python/run_all.py",
+    "build:ui": "node apps/electron/build.mjs",
+    "web": "npm run build:ui && node scripts/with-cuda.mjs tsx apps/engine/src/main.ts",
+    "cuda:install": "python3 -m pip install --target .cuda-libs \"nvidia-cublas>=13,<14\" \"nvidia-cuda-runtime>=13,<14\" nvidia-cudnn-cu13"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/ws": "^8.18.1",
+    "@types/yazl": "^3.3.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1",
+    "ws": "^8.21.3"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "onnxruntime-node@1.30.0": true,
+    "electron-winstaller": false
+  }
+}

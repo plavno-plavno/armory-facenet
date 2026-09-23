@@ -1,0 +1,39 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm ci
+      - run: bash models/download.sh
+      - run: python3 -m venv .venv-parity && .venv-parity/bin/pip install opencv-python-headless onnxruntime numpy scikit-image requests
+      - name: fixtures (LFW)
+        run: |
+          mkdir -p tests/fixtures/raw && cd tests/fixtures/raw
+          curl -fL -o lfw.tgz https://ndownloader.figshare.com/files/5976018 && tar xzf lfw.tgz
+          for f in lena.jpg messi5.jpg; do curl -fL -o $f https://raw.githubusercontent.com/opencv/opencv/4.x/samples/data/$f; done
+          curl -fL -o t1.jpg https://raw.githubusercontent.com/deepinsight/insightface/master/python-package/insightface/data/images/t1.jpg
+          curl -fL -o largest_selfie.jpg https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/example_outputs/largest_selfie.jpg
+      - run: npm run build
+      - run: npm run parity:ref   # regenerate the Python reference (§15.1) and compare in vitest
+      - run: npx vitest run
+  installers:
+    needs: test
+    strategy:
+      matrix: { os: [windows-latest, macos-latest, ubuntu-22.04] }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm ci
+      - run: bash models/download.sh
+        shell: bash
+      - run: npm run build && npm run dist -w faceid-desktop
+      # Smoke (§15.4 item 8): offline start -> enroll -> recognize from a test video; see docs/smoke-test.md
+      - uses: actions/upload-artifact@v4
+        with: { name: installers-${{ matrix.os }}, path: apps/electron/out/* }

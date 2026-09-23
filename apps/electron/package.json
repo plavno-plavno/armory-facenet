@@ -1,0 +1,30 @@
+{
+  "name": "faceid-desktop",
+  "productName": "FaceID Engine",
+  "version": "0.1.0",
+  "description": "Local offline face recognition server",
+  "author": {
+    "name": "FaceID Engine",
+    "email": "maintainer@example.com"
+  },
+  "private": true,
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node build.mjs && electron .",
+    "dist": "node build.mjs && electron-builder --config electron-builder.yml"
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2"
+  },
+  "dependencies": {
+    "onnxruntime-node": "^1.30.0",
+    "sharp": "^0.35.4",
+    "pino": "^10.3.1",
+    "pino-roll": "*"
+  },
+  "homepage": "https://example.com/faceid-engine",
+  "desktopName": "faceid-desktop.desktop"
+}

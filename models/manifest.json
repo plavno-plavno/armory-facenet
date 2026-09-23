@@ -1,0 +1,80 @@
+{
+  "detector": {
+    "id": "yunet-2026may",
+    "file": "face_detection_yunet_2026may.onnx",
+    "sha256": "ebafce4e3c118d6554634be5c27ab333b4c047a9a8c3faf1d7cf93101c22f0f0",
+    "channelOrder": "BGR",
+    "normalize": null
+  },
+  "embedder": {
+    "id": "lvface-s-glint360k",
+    "file": "LVFace-S_Glint360K.onnx",
+    "sha256": "cd09f27c82ce0a3633fb8b1966d779a7171b23aa4f14ca0de6edf9677573d119",
+    "inputSize": [
+      112,
+      112
+    ],
+    "channelOrder": "RGB",
+    "mean": [
+      127.5,
+      127.5,
+      127.5
+    ],
+    "std": [
+      127.5,
+      127.5,
+      127.5
+    ],
+    "embeddingDim": 512,
+    "dynamicBatch": true,
+    "preprocessVersion": 1
+  },
+  "embedders": [
+    {
+      "id": "lvface-t-glint360k",
+      "file": "LVFace-T_Glint360K.onnx",
+      "sha256": "bf8da0e1e93c432d9a1d874a9ba0990f5859f970e8864b3990f2f33d11f9cdb3",
+      "inputSize": [
+        112,
+        112
+      ],
+      "channelOrder": "RGB",
+      "mean": [
+        127.5,
+        127.5,
+        127.5
+      ],
+      "std": [
+        127.5,
+        127.5,
+        127.5
+      ],
+      "embeddingDim": 512,
+      "dynamicBatch": true,
+      "preprocessVersion": 1
+    },
+    {
+      "id": "lvface-b-glint360k",
+      "file": "LVFace-B_Glint360K.onnx",
+      "sha256": "9d834ed8e927fd35b9123b2bf97c40aad05785b1f9ecfb1c4c1f6242d38d1382",
+      "inputSize": [
+        112,
+        112
+      ],
+      "channelOrder": "RGB",
+      "mean": [
+        127.5,
+        127.5,
+        127.5
+      ],
+      "std": [
+        127.5,
+        127.5,
+        127.5
+      ],
+      "embeddingDim": 512,
+      "dynamicBatch": true,
+      "preprocessVersion": 1
+    }
+  ]
+}

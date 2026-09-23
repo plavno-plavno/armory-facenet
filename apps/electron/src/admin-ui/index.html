@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self' http://127.0.0.1:* https://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:*"
+    />
+    <title>FaceID Engine</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <aside class="nav">
+      <div class="brand">FaceID Engine</div>
+      <a href="#/dashboard" data-route="dashboard">Status</a>
+      <a href="#/recognize" data-route="recognize">Recognize</a>
+      <a href="#/persons" data-route="persons">Persons</a>
+      <a href="#/enroll" data-route="enroll">Enrollment</a>
+      <a href="#/streams" data-route="streams">Streams</a>
+      <a href="#/events" data-route="events">Events</a>
+      <a href="#/settings" data-route="settings">Settings</a>
+      <div class="nav-foot" id="engine-state">connecting…</div>
+    </aside>
+    <main id="view"></main>
+    <div id="toast" class="toast hidden"></div>
+    <script src="app.js"></script>
+  </body>
+</html>

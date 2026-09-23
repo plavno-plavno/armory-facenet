@@ -1,0 +1,11 @@
+apps/electron/out/
+.cuda-libs/
+.data/
+dist/
+*.log
+models/*.onnx
+node_modules/
+out/
+tests/fixtures/raw/
+vendor/ffmpeg/*/*
+.venv-parity/
