@@ -27,11 +27,24 @@ export interface EmbedderManifest {
   preprocessVersion: number;
 }
 
+/** Anti-spoofing model (MiniFASNet): crop = detector box scaled by `cropScale`, raw 0..255, NCHW. */
+export interface LivenessManifest {
+  id: string;
+  file: string;
+  sha256: string;
+  inputSize: [number, number];
+  cropScale: number;
+  channelOrder: 'BGR';
+  realClass: number;
+}
+
 export interface ModelManifest {
   detector: DetectorManifest;
   embedder: EmbedderManifest;
   /** Alternative embedders selectable via config `models.embedder`. */
   embedders?: EmbedderManifest[];
+  /** Anti-spoofing ensemble: the live score is the mean real-class probability of all models. */
+  liveness?: LivenessManifest[];
 }
 
 export type ExecutionProviderPref = 'auto' | 'cpu' | 'cuda' | 'dml';

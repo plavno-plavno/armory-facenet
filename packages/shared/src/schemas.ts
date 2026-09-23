@@ -117,7 +117,7 @@ export const PersonList = z.object({
   total: z.number().int(),
 });
 
-export const RecognitionStatus = z.enum(['match', 'unknown', 'uncertain', 'low_quality']);
+export const RecognitionStatus = z.enum(['match', 'unknown', 'uncertain', 'low_quality', 'spoof']);
 export type RecognitionStatus = z.infer<typeof RecognitionStatus>;
 
 export const RecognitionEvent = z.object({

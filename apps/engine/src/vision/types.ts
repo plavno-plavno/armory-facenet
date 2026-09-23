@@ -56,12 +56,31 @@ export interface QualityAssessor {
   assess(frame: Frame, det: Detection, face: AlignedFace): QualityReport;
 }
 
+/** Per-frame liveness input: one crop per model, cut from the full frame around the face (spec §7.9). */
+export interface LivenessSample {
+  crops: Uint8Array[];
+}
+
+export interface LivenessResult {
+  live: boolean;
+  score: number; // mean real-class probability, 0..1
+}
+
 export interface LivenessChecker {
-  check(faces: AlignedFace[], frames: Frame[]): Promise<{ live: boolean; score: number }>;
+  /** false: the check is off (config or model missing); sample()/check() are not called. */
+  enabled(): boolean;
+  sample(frame: Frame, det: Detection): LivenessSample;
+  check(samples: LivenessSample[]): Promise<LivenessResult>;
 }
 
 export class NoopLivenessChecker implements LivenessChecker {
-  async check(): Promise<{ live: boolean; score: number }> {
+  enabled(): boolean {
+    return false;
+  }
+  sample(): LivenessSample {
+    return { crops: [] };
+  }
+  async check(): Promise<LivenessResult> {
     return { live: true, score: 1 };
   }
 }

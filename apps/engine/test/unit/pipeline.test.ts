@@ -12,7 +12,7 @@ import { PipelineMetrics, StreamRuntime } from '../../src/pipeline/stream-runtim
 import { IouTracker } from '../../src/pipeline/tracker.js';
 import { PlainCipher } from '../../src/store/crypto.js';
 import { l2normalize } from '../../src/vision/embedder.js';
-import type { AlignedFace, Detection, Frame } from '../../src/vision/types.js';
+import type { AlignedFace, Detection, Frame, LivenessChecker } from '../../src/vision/types.js';
 import { NoopLivenessChecker } from '../../src/vision/types.js';
 
 const D = 8;
@@ -97,7 +97,7 @@ interface Scene {
   faces: { x: number; size?: number; who: Float32Array }[];
 }
 
-function makeRuntime(cfgPatch: Record<string, unknown> = {}) {
+function makeRuntime(cfgPatch: Record<string, unknown> = {}, liveness: LivenessChecker = new NoopLivenessChecker()) {
   const cfg = EngineConfig.parse({
     quality: { minSharpness: 0, minFaceSize: 80, requireInFrame: false, brightness: [0, 255] },
     pipeline: { detectFps: 60, cooldownMs: 10000, maxRetries: 2, maxConcurrentTracks: 3 },
@@ -152,7 +152,7 @@ function makeRuntime(cfgPatch: Record<string, unknown> = {}) {
     bus,
     journal: new RecognitionJournal('/nonexistent'),
     cipher: new PlainCipher(),
-    liveness: new NoopLivenessChecker(),
+    liveness,
     metrics: new PipelineMetrics(),
     log: pino({ level: 'silent' }),
   });
@@ -228,6 +228,56 @@ describe('track state machine (§7.4)', () => {
     await h.step(5);
     const ids = h.events.map((e) => e.person?.id).sort();
     expect(ids).toEqual(['A', 'B']);
+  });
+});
+
+/** Fixed-verdict liveness checker; counts the frames it was asked about. */
+function fakeLiveness(score: number, enabled = true) {
+  const seen = { samples: 0, checks: 0 };
+  const checker: LivenessChecker = {
+    enabled: () => enabled,
+    sample: () => ({ crops: [] }),
+    async check(samples) {
+      seen.samples += samples.length;
+      seen.checks++;
+      return { live: score >= 0.5, score };
+    },
+  };
+  return { checker, seen };
+}
+
+describe('liveness (§7.9)', () => {
+  it('spoof is final: no identification, nobody named, no retries', async () => {
+    const l = fakeLiveness(0.1);
+    const h = makeRuntime({}, l.checker);
+    h.setScene({ faces: [{ x: 100, who: unit(0) }] });
+    await h.step(20);
+    expect(h.events.map((e) => e.status)).toEqual(['spoof']);
+    expect(h.events[0].person).toBeUndefined();
+    expect(h.events[0].score).toBeNull();
+    expect(h.events[0].liveness).toEqual({ live: false, score: 0.1 });
+    expect(h.embedCalls()).toBe(0);
+    expect(l.seen.samples).toBe(3); // topK best frames
+  });
+
+  it('live face is identified as usual and the liveness result is published', async () => {
+    const l = fakeLiveness(0.97);
+    const h = makeRuntime({}, l.checker);
+    h.setScene({ faces: [{ x: 100, who: unit(0) }] });
+    await h.step(5);
+    expect(h.events.map((e) => e.status)).toEqual(['match']);
+    expect(h.events[0].person?.id).toBe('A');
+    expect(h.events[0].liveness).toEqual({ live: true, score: 0.97 });
+  });
+
+  it('disabled checker is never called and liveness stays null', async () => {
+    const l = fakeLiveness(0.1, false);
+    const h = makeRuntime({}, l.checker);
+    h.setScene({ faces: [{ x: 100, who: unit(0) }] });
+    await h.step(5);
+    expect(h.events.map((e) => e.status)).toEqual(['match']);
+    expect(h.events[0].liveness).toBeNull();
+    expect(l.seen.checks).toBe(0);
   });
 });
 

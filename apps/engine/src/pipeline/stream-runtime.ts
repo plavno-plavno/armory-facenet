@@ -13,8 +13,8 @@ import type { Logger } from '../util/logger.js';
 import { encodeJpegBgr } from '../vision/image.js';
 import type { VisionStack } from '../vision/index.js';
 import { DefaultQualityAssessor } from '../vision/quality.js';
-import type { Detection, Frame, LivenessChecker } from '../vision/types.js';
-import { Burst, type BurstCandidate } from './burst.js';
+import type { Detection, Frame, LivenessChecker, LivenessResult } from '../vision/types.js';
+import { Burst, checkLiveness, type BurstCandidate } from './burst.js';
 import { identifyBurst } from './decision.js';
 import { IouTracker, type Track } from './tracker.js';
 import type { FrameSource, SourceStatus } from './sources/types.js';
@@ -200,6 +200,7 @@ export class StreamRuntime {
       const quality = assessor.assess(frame, det, aligned);
       const cand: BurstCandidate = { det, aligned, quality };
       if (cfg.events.storeSnapshots) cand.frame = frame;
+      if (quality.passed && this.deps.liveness.enabled()) cand.liveness = this.deps.liveness.sample(frame, det);
       ctx.burst.add(cand);
       if (ctx.burst.isComplete(frame.ts, cfg.burst)) this.finishBurst(ctx);
     }
@@ -229,14 +230,19 @@ export class StreamRuntime {
 
   private async identify(ctx: TrackCtx, best: BurstCandidate[]): Promise<void> {
     const cfg = this.deps.cfg();
+    // Spoof is final for the track and skips identification: nobody is named for a photo / screen.
+    const liveness = await checkLiveness(this.deps.liveness, best);
+    if (liveness && !liveness.live) {
+      ctx.state = 'COOLDOWN';
+      await this.publish(ctx, { status: 'spoof', framesUsed: best.length, liveness }, best[0]);
+      return;
+    }
     const embs = await this.deps.vision.embedder.embed(best.map((c) => c.aligned));
-    // v1: NoopLivenessChecker; the result is not exposed (event.liveness = null, spec §7.9).
-    await this.deps.liveness.check(best.map((c) => c.aligned), best.flatMap((c) => (c.frame ? [c.frame] : [])));
     const d = identifyBurst(this.deps.index(), embs, cfg.match);
     let status: RecognitionEvent['status'] = d.status;
     if (status === 'uncertain') {
       if (ctx.attempt <= cfg.pipeline.maxRetries) {
-        await this.publish(ctx, { status, framesUsed: embs.length, decision: d }, best[0]);
+        await this.publish(ctx, { status, framesUsed: embs.length, decision: d, liveness }, best[0]);
         ctx.attempt++;
         ctx.state = 'COLLECTING';
         return;
@@ -250,12 +256,18 @@ export class StreamRuntime {
       this.lastMatch.set(d.top.personId, now);
       if (last !== undefined && now - last < cfg.pipeline.cooldownMs) return; // suppressed repeat (spec §7.4)
     }
-    await this.publish(ctx, { status, framesUsed: embs.length, decision: d }, best[0]);
+    await this.publish(ctx, { status, framesUsed: embs.length, decision: d, liveness }, best[0]);
   }
 
   private async publish(
     ctx: TrackCtx,
-    r: { status: RecognitionEvent['status']; framesUsed: number; decision?: ReturnType<typeof identifyBurst>; reasons?: Record<string, number> },
+    r: {
+      status: RecognitionEvent['status'];
+      framesUsed: number;
+      decision?: ReturnType<typeof identifyBurst>;
+      reasons?: Record<string, number>;
+      liveness?: LivenessResult | null;
+    },
     bestCand?: BurstCandidate,
   ): Promise<void> {
     const cfg = this.deps.cfg();
@@ -274,7 +286,7 @@ export class StreamRuntime {
       framesUsed: r.framesUsed,
       attempt: ctx.attempt,
       latencyMs: Date.now() - ctx.track.firstSeenWall,
-      liveness: null,
+      liveness: r.liveness ? { live: r.liveness.live, score: r4(r.liveness.score)! } : null,
     };
     if (r.status === 'match' && d?.top) {
       const p = this.deps.person(d.top.personId);

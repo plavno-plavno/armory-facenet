@@ -14,7 +14,7 @@ import { newId, nowIso } from '../util/ids.js';
 import { encodeJpegBgr, encodePngRgb } from '../vision/image.js';
 import { DefaultQualityAssessor } from '../vision/quality.js';
 import type { Detection, Frame } from '../vision/types.js';
-import { Burst } from './burst.js';
+import { Burst, checkLiveness } from './burst.js';
 import { FfmpegSource } from './sources/ffmpeg.js';
 import type { FrameSource, WebcamProvider } from './sources/types.js';
 import { StreamRuntime, type RuntimeDeps } from './stream-runtime.js';
@@ -211,32 +211,36 @@ export class StreamManager {
         b ??= new Burst(frame.ts);
         const aligned = this.deps.vision.aligner.align(frame, det.landmarks);
         const quality = assessor.assess(frame, det, aligned);
-        b.add({ det, aligned, quality, frame: quality.passed ? frame : undefined });
+        const live = quality.passed && this.deps.liveness.enabled() ? this.deps.liveness.sample(frame, det) : undefined;
+        b.add({ det, aligned, quality, frame: quality.passed ? frame : undefined, liveness: live });
         if (b.isComplete(frame.ts, cfg.burst) && b.enoughGood(cfg.burst)) finish(null);
       });
     });
 
     const best = burst.best(cfg.burst.topK);
-    const embs = await this.deps.vision.embedder.embed(best.map((c) => c.aligned));
-    const index = this.deps.index();
-    const d = identifyBurst(index, embs, cfg.match);
-    const probeCands = index.match(meanEmbedding(embs), 3);
     const r4 = (v: number | null) => (v === null ? null : Math.round(v * 10000) / 10000);
-    const top = d.status === 'match' && d.top ? this.deps.person(d.top.personId) : undefined;
+    // Spoof skips identification entirely: no decision, no candidates (see StreamRuntime.identify).
+    const liveness = await checkLiveness(this.deps.liveness, best);
+    const spoof = !!liveness && !liveness.live;
+    const embs = spoof ? [] : await this.deps.vision.embedder.embed(best.map((c) => c.aligned));
+    const index = this.deps.index();
+    const d = spoof ? null : identifyBurst(index, embs, cfg.match);
+    const probeCands = spoof ? [] : index.match(meanEmbedding(embs), 3);
+    const top = d?.status === 'match' && d.top ? this.deps.person(d.top.personId) : undefined;
     const ev: RecognitionEvent = {
       type: 'recognition.result',
       eventId: newId(),
       ts: nowIso(),
       sourceId: id,
       trackId: `manual-${Date.now().toString(36)}`,
-      status: d.status,
-      score: r4(d.score),
-      secondScore: r4(d.secondScore),
-      frameAgreement: r4(d.frameAgreement),
-      framesUsed: embs.length,
+      status: d?.status ?? 'spoof',
+      score: r4(d?.score ?? null),
+      secondScore: r4(d?.secondScore ?? null),
+      frameAgreement: d ? r4(d.frameAgreement) : null,
+      framesUsed: best.length,
       attempt: 1,
       latencyMs: Date.now() - started,
-      liveness: null,
+      liveness: liveness ? { live: liveness.live, score: r4(liveness.score)! } : null,
     };
     if (top) {
       ev.person = { id: top.id, externalId: top.externalId, firstName: top.firstName, lastName: top.lastName };

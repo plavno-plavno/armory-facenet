@@ -23,7 +23,7 @@ import { AesGcmCipher, PlainCipher, type Cipher } from './store/crypto.js';
 import { FileStore } from './store/file-store.js';
 import { createLogger, type Logger } from './util/logger.js';
 import { prepareCuda } from './vision/cuda.js';
-import { loadVision, NoopLivenessChecker, type VisionStack } from './vision/index.js';
+import { loadVision, OnnxLivenessChecker, type VisionStack } from './vision/index.js';
 
 export interface EngineOptions {
   dataDir: string;
@@ -94,7 +94,12 @@ export class Engine {
       detector: cfg().detector,
       verifyChecksums: opts.verifyModelChecksums ?? true,
     });
-    log.info({ detector: vision.info.detector, embedder: vision.info.embedder }, 'models loaded');
+    log.info({ detector: vision.info.detector, embedder: vision.info.embedder, liveness: vision.info.liveness }, 'models loaded');
+    if (!vision.liveness.length && cfg().liveness.enabled) {
+      const why = vision.info.liveness.missing.length ? `missing ${vision.info.liveness.missing.join(', ')} — run models/download.sh` : 'no liveness models in manifest.json';
+      warnings.push(`Anti-spoofing is off (${why}): photos and screens are not rejected.`);
+      log.warn({ missing: vision.info.liveness.missing }, 'liveness models unavailable, anti-spoofing disabled');
+    }
     if (vision.info.embedder.fallbackReason) {
       const cuda = prepareCuda();
       const hint = cuda.missing.length ? ` Missing CUDA libraries: ${cuda.missing.join(', ')} — run "npm run cuda:install" or install the CUDA 13 runtime + cuDNN 9.` : '';
@@ -124,7 +129,7 @@ export class Engine {
         bus,
         journal,
         cipher,
-        liveness: new NoopLivenessChecker(),
+        liveness: new OnnxLivenessChecker(vision.liveness, () => cfg().liveness),
         metrics,
         log,
       },
@@ -189,6 +194,7 @@ export class Engine {
       models: {
         detector: this.vision.info.detector,
         embedder: this.vision.info.embedder,
+        liveness: { ...this.vision.info.liveness, enabled: this.cfg().liveness.enabled && this.vision.liveness.length > 0 },
       },
       gallery: this.index.stats(),
       streams: streams.map((s) => ({ id: s.id, name: s.name, status: s.status, fps: s.fps, droppedFrames: s.droppedFrames })),

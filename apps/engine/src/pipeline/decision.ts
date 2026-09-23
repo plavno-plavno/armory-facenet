@@ -6,7 +6,7 @@ import type { GalleryIndex, MatchCandidate } from '../gallery/index.js';
 import { meanEmbedding } from '../vision/embedder.js';
 
 export interface Decision {
-  status: Exclude<RecognitionStatus, 'low_quality'>;
+  status: Exclude<RecognitionStatus, 'low_quality' | 'spoof'>;
   top: MatchCandidate | null;
   score: number | null;
   secondScore: number | null;

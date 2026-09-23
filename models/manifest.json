@@ -76,5 +76,31 @@
       "dynamicBatch": true,
       "preprocessVersion": 1
     }
+  ],
+  "liveness": [
+    {
+      "id": "minifasnet-v2",
+      "file": "MiniFASNetV2.onnx",
+      "sha256": "b32929adc2d9c34b9486f8c4c7bc97c1b69bc0ea9befefc380e4faae4e463907",
+      "inputSize": [
+        80,
+        80
+      ],
+      "cropScale": 2.7,
+      "channelOrder": "BGR",
+      "realClass": 1
+    },
+    {
+      "id": "minifasnet-v1se",
+      "file": "MiniFASNetV1SE.onnx",
+      "sha256": "ebab7f90c7833fbccd46d3a555410e78d969db5438e169b6524be444862b3676",
+      "inputSize": [
+        80,
+        80
+      ],
+      "cropScale": 4.0,
+      "channelOrder": "BGR",
+      "realClass": 1
+    }
   ]
 }

@@ -9,3 +9,4 @@ out/
 tests/fixtures/raw/
 vendor/ffmpeg/*/*
 .venv-parity/
+__pycache__/

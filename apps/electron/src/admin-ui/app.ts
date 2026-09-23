@@ -153,6 +153,8 @@ async function dashboard() {
         h('dd', {}, `${hl.models.detector.id} (${hl.models.detector.executionProvider})`),
         h('dt', {}, 'Embedding model'),
         h('dd', {}, `${hl.models.embedder.modelKey} (${hl.models.embedder.executionProvider})`),
+        h('dt', {}, 'Anti-spoofing'),
+        h('dd', {}, hl.models.liveness?.enabled ? hl.models.liveness.models.join(' + ') : h('span', { class: 'err' }, 'off')),
         h('dt', {}, 'Uptime'),
         h('dd', {}, `${Math.round(hl.uptimeSec / 60)} min`),
         ...(hl.warnings as string[]).flatMap((w) => [h('dt', { class: 'err' }, 'Warning'), h('dd', { class: 'err' }, w)]),
@@ -381,7 +383,7 @@ const REASON_LABELS: Record<string, string> = {
   brightness: 'poor lighting',
   inFrame: 'face at the edge of the frame',
 };
-const STATUS_LABELS: Record<string, string> = { match: 'Recognized', unknown: 'Unknown', uncertain: 'Uncertain', low_quality: 'Low quality' };
+const STATUS_LABELS: Record<string, string> = { match: 'Recognized', unknown: 'Unknown', uncertain: 'Uncertain', low_quality: 'Low quality', spoof: 'Spoof' };
 
 async function recognizePage() {
   const { running, hint } = await runningStreamsOrHint();
@@ -420,6 +422,8 @@ async function recognizePage() {
           { class: 'kv' },
           h('dt', {}, 'Score / 2nd'),
           h('dd', {}, `${e.score ?? '—'} / ${e.secondScore ?? '—'}`),
+          h('dt', {}, 'Liveness'),
+          h('dd', {}, e.liveness ? `${e.liveness.score} (${e.liveness.live ? 'live' : 'spoof'})` : 'off'),
           h('dt', {}, 'Frame agreement'),
           h('dd', {}, e.frameAgreement ?? '—'),
           h('dt', {}, 'Frames'),
@@ -427,7 +431,9 @@ async function recognizePage() {
           h('dt', {}, 'Time'),
           h('dd', {}, `${Math.round(performance.now() - t0)} ms`),
         ),
-        r.candidates.length
+        e.status === 'spoof'
+          ? h('div', { class: 'err' }, 'Not a live face: a photo or a screen was shown to the camera. Identification was skipped.')
+          : r.candidates.length
           ? h(
               'table',
               { style: 'margin-top:12px' },
@@ -706,7 +712,7 @@ async function streamsPage() {
 async function eventsPage(params: URLSearchParams) {
   const status = params.get('status') ?? '';
   const j = await api.recognitions(Object.fromEntries([['limit', '100'], ...(status ? [['status', status]] : []), ...(params.get('cursor') ? [['cursor', params.get('cursor')!]] : [])]));
-  const sel = h('select', { onchange: () => (location.hash = `#/events?status=${sel.value}`) }, ['', 'match', 'unknown', 'uncertain', 'low_quality'].map((s) => h('option', { value: s, selected: s === status }, s || 'all')));
+  const sel = h('select', { onchange: () => (location.hash = `#/events?status=${sel.value}`) }, ['', 'match', 'unknown', 'uncertain', 'low_quality', 'spoof'].map((s) => h('option', { value: s, selected: s === status }, s || 'all')));
   const names = new Map<string, string>();
   for (const pid of new Set(j.items.map((e) => e.personId).filter(Boolean))) {
     const p = await api.getPerson(pid).catch(() => null);
@@ -717,7 +723,7 @@ async function eventsPage(params: URLSearchParams) {
     h(
       'table',
       {},
-      h('thead', {}, h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'Stream'), h('th', {}, 'Track'), h('th', {}, 'Status'), h('th', {}, 'Person'), h('th', {}, 'Score / 2nd'), h('th', {}, 'Frames'), h('th', {}, 'Attempt'), h('th', {}, 'Latency'))),
+      h('thead', {}, h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'Stream'), h('th', {}, 'Track'), h('th', {}, 'Status'), h('th', {}, 'Person'), h('th', {}, 'Score / 2nd'), h('th', {}, 'Liveness'), h('th', {}, 'Frames'), h('th', {}, 'Attempt'), h('th', {}, 'Latency'))),
       h(
         'tbody',
         {},
@@ -731,6 +737,7 @@ async function eventsPage(params: URLSearchParams) {
             h('td', {}, badge(e.status)),
             h('td', {}, e.personId ? h('a', { href: `#/person/${e.personId}` }, names.get(e.personId) ?? e.personId.slice(0, 8)) : '—'),
             h('td', {}, `${e.score ?? '—'} / ${e.secondScore ?? '—'}`),
+            h('td', {}, e.liveness?.score ?? '—'),
             h('td', {}, e.framesUsed),
             h('td', {}, e.attempt),
             h('td', {}, `${e.latencyMs} ms`),
@@ -755,6 +762,8 @@ const SETTINGS: [string, string, string][] = [
   ['pipeline.maxConcurrentTracks', 'Concurrent tracks', 'number'],
   ['burst.maxFrames', 'Frames per burst', 'number'],
   ['burst.topK', 'Top frames', 'number'],
+  ['liveness.enabled', 'Anti-spoofing (reject photos / screens)', 'checkbox'],
+  ['liveness.threshold', 'Liveness threshold (0..1)', 'number'],
   ['events.storeSnapshots', 'Store event snapshots', 'checkbox'],
   ['events.snapshotRetentionDays', 'Snapshot retention, days', 'number'],
   ['events.logRetentionDays', 'Journal retention, days', 'number'],

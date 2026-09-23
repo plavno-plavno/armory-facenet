@@ -4,9 +4,10 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { ARCFACE_TEMPLATE, estimateSimilarity, invertAffine, warpAffine } from '../../src/vision/align.js';
 import { decodeImage } from '../../src/vision/image.js';
 import { loadVision, type VisionStack } from '../../src/vision/index.js';
+import { livenessCrop } from '../../src/vision/liveness.js';
 import { buildDetectorInput, resizeBilinear } from '../../src/vision/preprocess.js';
 import { DefaultQualityAssessor, laplacianVariance } from '../../src/vision/quality.js';
-import type { Detection, Landmarks5, Point } from '../../src/vision/types.js';
+import type { Detection, Frame, Landmarks5, Point } from '../../src/vision/types.js';
 import { decodeYuNet, nms, rectIoU } from '../../src/vision/yunet.js';
 import { FIX, MODELS } from '../helpers.js';
 
@@ -172,5 +173,28 @@ describe('landmark order (spec §6.1: mandatory)', () => {
     const batch = await v.embedder.embed([a, a, a]);
     expect(Math.hypot(...e1)).toBeCloseTo(1, 5);
     for (const e of batch) for (let i = 0; i < e.length; i++) expect(e[i]).toBeCloseTo(e1[i], 4);
+  });
+});
+
+describe('liveness crop (Silent-Face-Anti-Spoofing CropImage)', () => {
+  // Pixel value = x coordinate, so the crop's left/right columns reveal where it was cut.
+  const frame: Frame = { width: 200, height: 100, ts: 0, sourceId: 't', data: new Uint8Array(200 * 100 * 3) };
+  for (let y = 0; y < 100; y++) for (let x = 0; x < 200; x++) frame.data.fill(x, (y * 200 + x) * 3, (y * 200 + x) * 3 + 3);
+
+  it('scales the box around its center', () => {
+    // box 80..100 (w 20), scale 2 -> 70..110 wide, i.e. 41 px incl. both ends, identity resize.
+    const c = livenessCrop(frame, [80, 40, 20, 20], 2, 41, 41);
+    expect([c[0], c[40 * 3]]).toEqual([70, 110]);
+  });
+
+  it('shifts (not clips) a crop that leaves the frame, keeping its size', () => {
+    const c = livenessCrop(frame, [2, 40, 20, 20], 2, 41, 41);
+    expect([c[0], c[40 * 3]]).toEqual([0, 40]);
+  });
+
+  it('caps the scale so the crop fits the frame', () => {
+    // scale 4 on a 30 px box would be 120 px tall: capped to (100 - 1) / 30 -> columns 50..149.
+    const c = livenessCrop(frame, [85, 35, 30, 30], 4, 100, 100);
+    expect([c[0], c[99 * 3]]).toEqual([50, 149]);
   });
 });

@@ -41,7 +41,7 @@ const Webhook = z.object({
   url: z.url(),
   events: z.array(z.string()).default(['recognition.result']),
   secret: z.string().min(8),
-  statuses: z.array(z.enum(['match', 'unknown', 'uncertain', 'low_quality'])).optional(),
+  statuses: z.array(z.enum(['match', 'unknown', 'uncertain', 'low_quality', 'spoof'])).optional(),
 });
 
 export const EngineConfig = z.object({
@@ -99,6 +99,14 @@ export const EngineConfig = z.object({
       rejectThreshold: z.number().min(-1).max(1).default(0.3),
       margin: z.number().min(0).max(2).default(0.05),
       minFrameAgreement: z.number().min(0).max(1).default(0.6),
+    })
+    .prefault({}),
+  // Anti-spoofing (spec §7.9, R4). The threshold is on the mean real-face probability of the burst;
+  // like the match thresholds it must be calibrated on the target camera.
+  liveness: z
+    .object({
+      enabled: z.boolean().default(true),
+      threshold: z.number().min(0).max(1).default(0.5),
     })
     .prefault({}),
   enroll: z

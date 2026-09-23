@@ -6,4 +6,8 @@ curl -fL -o face_detection_yunet_2026may.onnx https://github.com/opencv/opencv_z
 for v in T S B; do
   curl -fL -o "LVFace-${v}_Glint360K.onnx" "https://huggingface.co/bytedance-research/LVFace/resolve/main/LVFace-${v}_Glint360K/LVFace-${v}_Glint360K.onnx"
 done
+# Anti-spoofing (MiniFASNet, Apache-2.0): ONNX export of minivision-ai/Silent-Face-Anti-Spoofing.
+for m in MiniFASNetV2 MiniFASNetV1SE; do
+  curl -fL -o "$m.onnx" "https://github.com/yakhyo/face-anti-spoofing/releases/download/weights/$m.onnx"
+done
 sha256sum *.onnx

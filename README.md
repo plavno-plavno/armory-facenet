@@ -8,7 +8,7 @@ REST/WS API, потоковый пайплайн (веб-камера / RTSP / �
 
 ```bash
 npm ci
-bash models/download.sh                 # YuNet + LVFace-T/S/B, sha256 в models/manifest.json
+bash models/download.sh                 # YuNet + LVFace-T/S/B + MiniFASNet, sha256 в models/manifest.json
 npm run build                           # shared + engine
 
 # веб-режим без Electron: движок + админка в браузере на http://127.0.0.1:47810/
@@ -17,6 +17,21 @@ FACEID_PASSWORD='…' npm run web         # печатает адрес и то�
 npm start -w faceid-desktop             # на Ubuntu 24.04 в dev-режиме может понадобиться --no-sandbox
 npm run dist -w faceid-desktop          # установщики: NSIS / dmg / AppImage+deb
 ```
+
+### Модели
+
+`models/download.sh` скачивает в `models/` (в git не хранятся; при каждом старте движок сверяет sha256 с `models/manifest.json`):
+
+| Файл | Размер | Назначение | Источник, лицензия |
+|---|---|---|---|
+| `face_detection_yunet_2026may.onnx` | 0.2 МБ | детекция лиц | OpenCV Zoo, MIT |
+| `LVFace-S_Glint360K.onnx` | 304 МБ | эмбеддинги, **по умолчанию** | ByteDance LVFace, только некоммерческое использование (R1) |
+| `LVFace-T_Glint360K.onnx` | 77 МБ | эмбеддинги для слабых CPU (`models.embedder = lvface-t-glint360k`) | то же |
+| `LVFace-B_Glint360K.onnx` | 456 МБ | эмбеддинги, точнее и медленнее (`lvface-b-glint360k`) | то же |
+| `MiniFASNetV2.onnx`, `MiniFASNetV1SE.onnx` | 2 × 1.7 МБ | anti-spoofing (liveness): отклоняет фото и экраны (R4) | Silent-Face-Anti-Spoofing, Apache-2.0 |
+
+Если в уже установленном репозитории нет файлов MiniFASNet, запустите `bash models/download.sh` ещё раз.
+Без них движок работает, но без защиты от фото и экранов, и пишет предупреждение в `/health`.
 
 API: `http://127.0.0.1:47810/api/v1`, заголовок `Authorization: Bearer <token>`,
 OpenAPI — `GET /api/v1/openapi.json`.
@@ -96,6 +111,9 @@ npm run cuda:install      # cuBLAS / cudart / cuDNN (~1.5 ГБ) в .cuda-libs/ �
 - **R1 — веса LVFace только для некоммерческого исследовательского использования.** Для коммерческой
   дистрибуции нужна лицензия правообладателя или замена модели (через манифест + `/admin/reindex`).
 - **R8 — ffmpeg**: в установщик нужно положить LGPL-сборку в `vendor/ffmpeg/<platform>-<arch>/`; без неё используется ffmpeg из PATH.
-- **R4 — нет liveness** (v1): система не защищена от предъявления фото/экрана. Интерфейс `LivenessChecker` готов для v2.
+- **R4 — liveness пассивный**: ансамбль MiniFASNetV2 + V1SE (Silent-Face-Anti-Spoofing, Apache-2.0) по серии кадров;
+  при `liveness.score < liveness.threshold` событие получает статус `spoof`, идентификация не выполняется.
+  Ловит распечатки и экраны на обычной RGB-камере, но не маски и не всё подряд; порог 0.5 — заглушка, калибровать
+  на целевой камере (живые лица + распечатки/экраны). Без файлов моделей движок работает без liveness с предупреждением в `/health`.
 - Пороги `match.*` по умолчанию — заглушки; на LFW genuine ≈ 0.4–0.6, impostor ≈ 0–0.2. Рабочие значения — только после калибровки на целевой камере.
 - Открытые вопросы §18 (ОС, GPU, размер галереи, целевой FAR и др.) остаются открытыми.

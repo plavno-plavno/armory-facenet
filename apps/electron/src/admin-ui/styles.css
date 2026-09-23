@@ -60,7 +60,7 @@ label.f span { color: var(--muted); font-size: 12px; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; background: var(--line); }
 .badge.ok, .badge.match, .badge.running, .badge.active { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
 .badge.warn, .badge.uncertain, .badge.degraded, .badge.reconnecting, .badge.starting, .badge.low_quality { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
-.badge.bad, .badge.error, .badge.unknown, .badge.disabled { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
+.badge.bad, .badge.error, .badge.unknown, .badge.disabled, .badge.spoof { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
 .thumb { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; background: var(--line); }
 .photos { display: flex; gap: 10px; flex-wrap: wrap; }
 .photo { width: 132px; }
@@ -81,7 +81,7 @@ pre { background: var(--bg); padding: 10px; border-radius: 6px; overflow: auto; 
 @media (max-width: 1000px) { .split { grid-template-columns: 1fr; } }
 .verdict { font-size: 26px; font-weight: 700; margin: 4px 0 10px; }
 .verdict.match { color: var(--ok); }
-.verdict.unknown { color: var(--bad); }
+.verdict.unknown, .verdict.spoof { color: var(--bad); }
 .verdict.uncertain, .verdict.low_quality { color: var(--warn); }
 .faces { display: flex; gap: 14px; margin: 10px 0; }
 .faces figure { margin: 0; text-align: center; }

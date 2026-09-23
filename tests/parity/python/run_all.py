@@ -36,3 +36,21 @@ for name in sorted(os.listdir(FIX)):
 with open(os.path.join(EXP, 'reference.json'), 'w') as fp:
     json.dump(result, fp)
 print('faces total', sum(len(i['faces']) for i in result['images']))
+
+# Liveness (anti-spoofing): per-model real-class probability on the reference detector boxes.
+from liveness_ref import Ref as LivenessRef
+live_models = [m for m in manifest.get('liveness', []) if os.path.exists(os.path.join(MODELS, m['file']))]
+if live_models:
+    lrefs = {m['id']: LivenessRef(os.path.join(MODELS, m['file']), m['cropScale'], tuple(m['inputSize'])) for m in live_models}
+    live = {'images': []}
+    for d in [FIX, os.path.join(ROOT, 'tests', 'fixtures', 'liveness')]:
+        for name in sorted(os.listdir(d)):
+            img = cv2.imread(os.path.join(d, name), cv2.IMREAD_COLOR)
+            faces = detect(os.path.join(MODELS, manifest['detector']['file']), img)
+            live['images'].append({
+                'file': os.path.relpath(os.path.join(d, name), os.path.join(ROOT, 'tests', 'fixtures')),
+                'faces': [{'box': f['box'], 'real': {k: r.real_prob(img, f['box']) for k, r in lrefs.items()}} for f in faces],
+            })
+    with open(os.path.join(EXP, 'liveness.json'), 'w') as fp:
+        json.dump(live, fp, indent=1)
+    print('liveness faces', sum(len(i['faces']) for i in live['images']))

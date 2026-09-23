@@ -1,4 +1,4 @@
-// Parity tests Node vs Python reference (ТЗ §15.1). Reference data: npm run parity:ref.
+// Parity tests Node vs Python reference (spec §15.1). Reference data: npm run parity:ref.
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -10,6 +10,7 @@ import { rectIoU } from '../../apps/engine/src/vision/yunet.js';
 import type { AlignedFace, Detection, Landmarks5 } from '../../apps/engine/src/vision/types.js';
 import { OnnxEmbedder } from '../../apps/engine/src/vision/embedder.js';
 import { createSession, loadManifest } from '../../apps/engine/src/vision/models.js';
+import { OnnxLivenessChecker } from '../../apps/engine/src/vision/liveness.js';
 
 const ROOT = path.resolve(__dirname, '../..');
 const FIX = path.join(ROOT, 'tests/fixtures/parity');
@@ -154,5 +155,47 @@ describe('end-to-end: Node pipeline vs Python pipeline', () => {
     }
     console.log(`[parity] end-to-end min cosine ${min.toFixed(5)}`);
     expect(min).toBeGreaterThanOrEqual(0.98);
+  });
+});
+
+describe('parity: liveness (Silent-Face-Anti-Spoofing CropImage + MiniFASNet)', () => {
+  const live: { images: { file: string; faces: { box: Detection['box']; real: Record<string, number> }[] }[] } = JSON.parse(
+    readFileSync(path.join(EXP, 'liveness.json'), 'utf8'),
+  );
+  const faces = live.images.flatMap((i) => i.faces.map((f) => ({ file: i.file, ...f })));
+  let checker: OnnxLivenessChecker;
+  let ids: string[];
+  beforeAll(async () => {
+    const models = await Promise.all(
+      (loadManifest(MODELS).liveness ?? []).map(async (m) => ({ manifest: m, session: (await createSession(path.join(MODELS, m.file), 'cpu', 4)).session })),
+    );
+    ids = models.map((m) => m.manifest.id);
+    checker = new OnnxLivenessChecker(models, () => ({ enabled: true, threshold: 0.5 }));
+  });
+  const scoreOf = async (file: string, box: Detection['box']) => {
+    const dec = await decodeImage(readFileSync(path.join(FIX, '..', file)));
+    return checker.probabilities([checker.sample(dec.frame, { box, landmarks: [] as never, score: 1 })]);
+  };
+
+  // Crops agree with cv2 to <= 1 grey level (JPEG decode / rounding), but MiniFASNet takes raw 0..255
+  // input and moves by a few hundredths on such noise, hence 0.05.
+  it('real-class probability per model within 0.05 on every face (same boxes)', async () => {
+    let worst = 0;
+    for (const f of faces) {
+      const [ours] = await scoreOf(f.file, f.box);
+      ids.forEach((id, k) => (worst = Math.max(worst, Math.abs(ours[k] - f.real[id]))));
+    }
+    console.log(`[parity] liveness: ${faces.length} faces, worst abs diff ${worst.toFixed(4)}`);
+    expect(worst).toBeLessThanOrEqual(0.05);
+  });
+
+  it('sample images: real is live, printed / screen are spoofs', async () => {
+    const verdict = async (name: string) => {
+      const f = faces.find((x) => x.file === `liveness/${name}`)!;
+      return (await checker.check([checker.sample((await decodeImage(readFileSync(path.join(FIX, '..', f.file)))).frame, { box: f.box, landmarks: [] as never, score: 1 })])).live;
+    };
+    expect(await verdict('image_T1.jpg')).toBe(true);
+    expect(await verdict('image_F1.jpg')).toBe(false);
+    expect(await verdict('image_F2.jpg')).toBe(false);
   });
 });

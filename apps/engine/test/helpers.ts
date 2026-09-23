@@ -20,6 +20,8 @@ export const TEST_CONFIG = {
   enroll: { minShortSide: 200, quality: { maxYaw: 0.25, minSharpness: 50 } },
   quality: { minSharpness: 30 },
   match: { acceptThreshold: 0.35, rejectThreshold: 0.2, margin: 0.05 },
+  // Some low-res LFW press photos score as spoofs; liveness has its own tests.
+  liveness: { enabled: false },
 };
 
 export interface TestEngine {
